@@ -15,14 +15,18 @@ public class Character : MonoBehaviour
     [Tooltip("Represents how fast gravityContributionMultiplier will go back to 1f. The higher, the faster")] public float gravityComebackMultiplier = 15f;
     [Tooltip("The maximum speed reached when falling (in units/frame)")] public float maxFallSpeed = 50f;
     [Tooltip("Each frame while jumping, gravity will be multiplied by this amount in an attempt to 'cancel it' (= jump higher)")] public float gravityDivider = .6f;
+    public float slideFriction = 0.3f;
 
     private float gravityContributionMultiplier = 0f; //The factor which determines how much gravity is affecting verticalMovement
+    private float currentHitAngle; // The angle between the sarfas normal and the up vector
     private bool isJumping = false; //If true, a jump is in effect and the player is holding the jump button
+    private bool canJump = true; //If true, the player can jump
     private float jumpBeginTime = -Mathf.Infinity; //Time of the last jump
     private float turnSmoothSpeed; //Used by Mathf.SmoothDampAngle to smoothly rotate the character to their movement direction
     private float verticalMovement = 0f; //Represents how much a player will move vertically in a frame. Affected by gravity * gravityContributionMultiplier
     private Vector3 inputVector; //Initial input horizontal movement (y == 0f)
     private Vector3 movementVector; //Final movement vector
+    private Vector3 hitNormal; // The surfes normal that the character in collistion with 
 
     private void Awake()
     {
@@ -83,6 +87,13 @@ public class Character : MonoBehaviour
             }
         }
 
+        //If the character on slope we add some sliding to the movementVector
+        if(currentHitAngle > characterController.slopeLimit)
+        {
+            movementVector.x += (1f - hitNormal.y) * hitNormal.x * (speed - slideFriction);
+            movementVector.z += (1f - hitNormal.y) * hitNormal.z * (speed - slideFriction);
+        }
+
         //Apply the result and move the character in space
         movementVector.y = verticalMovement;
         characterController.Move(movementVector * Time.deltaTime);
@@ -100,6 +111,14 @@ public class Character : MonoBehaviour
         }
     }
 
+
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        hitNormal = hit.normal;
+        currentHitAngle = Vector3.Angle(Vector3.up, hit.normal);
+        canJump = currentHitAngle < characterController.slopeLimit;
+    }
+
     //---- COMMANDS ISSUED BY OTHER SCRIPTS ----
 
     public void Move(Vector3 movement)
@@ -109,7 +128,7 @@ public class Character : MonoBehaviour
 
     public void Jump()
     {
-        if (characterController.isGrounded)
+        if (characterController.isGrounded && canJump)
         {
             isJumping = true;
             jumpBeginTime = Time.time;
@@ -122,4 +141,5 @@ public class Character : MonoBehaviour
     {
         isJumping = false; //This will stop the reduction to the gravity, which will then quickly pull down the character
     }
+
 }
